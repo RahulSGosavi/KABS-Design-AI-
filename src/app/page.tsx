@@ -1,9 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useFlow } from '@genkit-ai/next/client';
-import type { GenerateKitchenRenderInput } from '@/ai/flows/generate-kitchen-render';
-import type { ModifyKitchenElementColorsInput } from '@/ai/flows/modify-kitchen-colors';
+import {
+  generateKitchenRender,
+  type GenerateKitchenRenderInput,
+} from '@/ai/flows/generate-kitchen-render';
+import {
+  modifyKitchenElementColors,
+  type ModifyKitchenElementColorsInput,
+} from '@/ai/flows/modify-kitchen-colors';
 import { useToast } from '@/hooks/use-toast';
 import { UploadStep } from '@/components/upload-step';
 import { Editor } from '@/components/editor';
@@ -20,58 +25,46 @@ export default function Home() {
   const [renderedImage, setRenderedImage] = useState<string | null>(null);
   const [isModifyingColor, setIsModifyingColor] = useState(false);
 
-  const { run: generateRender } = useFlow(
-    '/api/generateKitchenRender',
-    {
-      onSuccess: (output) => {
-        setRenderedImage(output.renderDataUri);
-        setStep('editing');
-      },
-      onError: (err) => {
-        console.error(err);
-        toast({
-          variant: 'destructive',
-          title: 'Render Failed',
-          description: 'Could not generate the kitchen render. Please try again.',
-        });
-        setStep('upload');
-      },
-    }
-  );
+  const handleFileSelect = (file: File | null, dataUri: string | null) => {
+    setPdfFile(file);
+    setPdfDataUri(dataUri);
+  };
 
-  const { run: modifyColor } = useFlow('/api/modifyKitchenColors', {
-    onSuccess: (output) => {
+  const handleGenerate = async () => {
+    if (!pdfDataUri) return;
+    setStep('rendering');
+    try {
+      const input: GenerateKitchenRenderInput = { floorPlanDataUri: pdfDataUri };
+      const output = await generateKitchenRender(input);
+      setRenderedImage(output.renderDataUri);
+      setStep('editing');
+    } catch (err) {
+      console.error(err);
+      toast({
+        variant: 'destructive',
+        title: 'Render Failed',
+        description:
+          'Could not generate the kitchen render. Please try again.',
+      });
+      setStep('upload');
+    }
+  };
+
+  const handleColorChange = async (input: ModifyKitchenElementColorsInput) => {
+    setIsModifyingColor(true);
+    try {
+      const output = await modifyKitchenElementColors(input);
       setRenderedImage(output.modifiedImage);
-    },
-    onError: (err) => {
+    } catch (err) {
       console.error(err);
       toast({
         variant: 'destructive',
         title: 'Color Change Failed',
         description: 'Could not apply the color change. Please try again.',
       });
-    },
-    onFinally: () => {
+    } finally {
       setIsModifyingColor(false);
     }
-  });
-
-
-  const handleFileSelect = (file: File, dataUri: string) => {
-    setPdfFile(file);
-    setPdfDataUri(dataUri);
-  };
-
-  const handleGenerate = () => {
-    if (!pdfDataUri) return;
-    setStep('rendering');
-    const input: GenerateKitchenRenderInput = { floorPlanDataUri: pdfDataUri };
-    generateRender(input);
-  };
-  
-  const handleColorChange = (input: ModifyKitchenElementColorsInput) => {
-    setIsModifyingColor(true);
-    modifyColor(input);
   };
 
   const handleStartOver = () => {
@@ -86,8 +79,12 @@ export default function Home() {
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-4 text-center">
         <KabsLogo className="h-12 w-12 text-primary" />
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <h1 className="text-2xl font-semibold tracking-tight">Generating Your Kitchen</h1>
-        <p className="text-muted-foreground">The AI is working its magic. This might take a moment...</p>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Generating Your Kitchen
+        </h1>
+        <p className="text-muted-foreground">
+          The AI is working its magic. This might take a moment...
+        </p>
       </main>
     );
   }
@@ -107,7 +104,11 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <UploadStep onFileSelect={handleFileSelect} onGenerate={handleGenerate} pdfFile={pdfFile} />
+      <UploadStep
+        onFileSelect={handleFileSelect}
+        onGenerate={handleGenerate}
+        pdfFile={pdfFile}
+      />
     </main>
   );
 }
