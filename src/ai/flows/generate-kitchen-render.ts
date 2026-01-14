@@ -46,41 +46,39 @@ const generateKitchenRenderFlow = ai.defineFlow(
     outputSchema: GenerateKitchenRenderOutputSchema,
   },
   async ({floorPlanDataUri}) => {
-    const {output} = await ai.generate({
-      prompt: [
+    const prompt = {
+        prompt: [
         {text: 'You are an AI that generates photorealistic kitchen renders from 2D floor plans. Take the provided floor plan and generate a photorealistic kitchen render, preserving the original layout.'},
         {media: {url: floorPlanDataUri}}
       ],
-      model: 'googleai/gemini-2.5-flash',
-      output: {
-        schema: GenerateKitchenRenderOutputSchema,
-      },
+      model: 'googleai/gemini-2.5-flash-image-preview',
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
       },
-    });
-    
-    // Fallback in case the model does not return the expected output format.
-    if (output) {
-      return output;
-    } else {
-      // Find the first media part and assume it is the rendered image.
-      const { message } = await ai.generate({
-        prompt: [
-          {text: 'You are an AI that generates photorealistic kitchen renders from 2D floor plans. Take the provided floor plan and generate a photorealistic kitchen render, preserving the original layout.'},
-          {media: {url: floorPlanDataUri}}
-        ],
-        model: 'googleai/gemini-2.5-flash',
-        config: {
-          responseModalities: ['TEXT', 'IMAGE'],
+    };
+
+    try {
+      const {output} = await ai.generate({
+        ...prompt,
+        output: {
+          schema: GenerateKitchenRenderOutputSchema,
         },
       });
 
-      const imagePart = message.content.find(part => part.media);
-      if (!imagePart || !imagePart.media) {
-        throw new Error("Render generation failed: No image was returned from the model.");
+      if (output) {
+        return output;
       }
-      return { renderDataUri: imagePart.media.url };
+    } catch (e) {
+      console.log('Structured output failed, falling back to direct media extraction.', e);
     }
+
+    // Fallback in case the model does not return the expected output format.
+    const { message } = await ai.generate(prompt);
+
+    const imagePart = message.content.find(part => part.media);
+    if (!imagePart || !imagePart.media) {
+      throw new Error("Render generation failed: No image was returned from the model.");
+    }
+    return { renderDataUri: imagePart.media.url };
   }
 );

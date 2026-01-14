@@ -57,37 +57,7 @@ const modifyKitchenElementColorsFlow = ai.defineFlow(
     outputSchema: ModifyKitchenElementColorsOutputSchema,
   },
   async ({baseImage, maskImage, newColor}) => {
-    const {output} = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-image-preview',
-      prompt: [
-        {
-          text: `You are an AI that takes in a base image of a kitchen render, a mask image highlighting a region (e.g., cabinets, walls), and a desired new color.
-
-Your task is to modify the color of the specified region in the base image to the new color, ensuring that the layout, lighting, and overall realism of the image are preserved.
-You must only modify the color of the region specified in the mask, and leave the rest of the image unchanged.
-
-New Color: ${newColor}
-
-Return the modified image as a data URI.`,
-        },
-        {media: {url: baseImage}},
-        {media: {url: maskImage}},
-      ],
-      output: {
-        schema: ModifyKitchenElementColorsOutputSchema,
-        format: 'json',
-      },
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'],
-      },
-    });
-
-     // Fallback in case the model does not return the expected output format.
-    if (output) {
-      return output;
-    } else {
-      // Find the first media part and assume it is the rendered image.
-      const { message } = await ai.generate({
+    const prompt = {
         model: 'googleai/gemini-2.5-flash-image-preview',
         prompt: [
           {
@@ -106,13 +76,31 @@ Return the modified image as a data URI.`,
         config: {
           responseModalities: ['TEXT', 'IMAGE'],
         },
-      });
+    };
+
+    try {
+        const {output} = await ai.generate({
+            ...prompt,
+            output: {
+                schema: ModifyKitchenElementColorsOutputSchema,
+                format: 'json',
+            },
+        });
+        if (output) {
+            return output;
+        }
+    } catch(e) {
+        console.log('Structured output failed, falling back to direct media extraction.', e);
+    }
+
+
+     // Fallback in case the model does not return the expected output format.
+      const { message } = await ai.generate(prompt);
 
       const imagePart = message.content.find(part => part.media);
       if (!imagePart || !imagePart.media) {
         throw new Error("Color modification failed: No image was returned from the model.");
       }
       return { modifiedImage: imagePart.media.url };
-    }
   }
 );
