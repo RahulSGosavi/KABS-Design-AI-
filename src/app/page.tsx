@@ -25,9 +25,19 @@ export default function Home() {
   const [renderedImage, setRenderedImage] = useState<string | null>(null);
   const [isModifyingColor, setIsModifyingColor] = useState(false);
 
-  const handleFileSelect = (file: File | null, dataUri: string | null) => {
+  const handleFileSelect = (file: File | null) => {
     setPdfFile(file);
-    setPdfDataUri(dataUri);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event: ProgressEvent<FileReader>) => {
+        if (event.target?.result) {
+          setPdfDataUri(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setPdfDataUri(null);
+    }
   };
 
   const handleGenerate = async () => {

@@ -9,9 +9,10 @@ import { UploadCloud, File, X, Loader2 } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { KabsLogo } from './kabs-logo';
 import { cn } from '@/lib/utils';
+import { Progress } from './ui/progress';
 
 interface UploadStepProps {
-  onFileSelect: (file: File, dataUri: string) => void;
+  onFileSelect: (file: File | null) => void;
   onGenerate: () => void;
   pdfFile: File | null;
 }
@@ -20,18 +21,59 @@ const bgImage = PlaceHolderImages.find(img => img.id === 'upload-background');
 
 export function UploadStep({ onFileSelect, onGenerate, pdfFile }: UploadStepProps) {
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
+  const readFileInChunks = (file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      const chunkSize = 1024 * 512; // 512KB chunks
+      const totalChunks = Math.ceil(file.size / chunkSize);
+      let currentChunk = 0;
+      let fileContent = '';
+
+      reader.onload = (event: ProgressEvent<FileReader>) => {
+        if (event.target?.result) {
+          // The result includes the 'data:mime/type;base64,' prefix. We only want the base64 part.
+          const base64Part = (event.target.result as string).split(',')[1];
+          fileContent += base64Part;
+          currentChunk++;
+          setUploadProgress(Math.round((currentChunk / totalChunks) * 100));
+
+          if (currentChunk < totalChunks) {
+            loadNextChunk();
+          } else {
+            // Re-add the data URI prefix to the concatenated content
+            const finalDataUri = `data:${file.type};base64,${fileContent}`;
+            setUploadProgress(100);
+            setTimeout(() => {
+                onFileSelect(file);
+                resolve(finalDataUri);
+            }, 300);
+          }
+        }
+      };
+
+      reader.onerror = (error) => {
+        reject(error);
+      };
+      
+      const loadNextChunk = () => {
+        const start = currentChunk * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const blobSlice = file.slice(start, end);
+        reader.readAsDataURL(blobSlice);
+      }
+
+      loadNextChunk();
+    });
+  };
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
       if (file && file.type === 'application/pdf') {
-        const reader = new FileReader();
-        reader.onload = (event: ProgressEvent<FileReader>) => {
-          if (event.target?.result) {
-            onFileSelect(file, event.target.result as string);
-          }
-        };
-        reader.readAsDataURL(file);
+        setUploadProgress(0);
+        readFileInChunks(file);
       }
     },
     [onFileSelect]
@@ -46,6 +88,11 @@ export function UploadStep({ onFileSelect, onGenerate, pdfFile }: UploadStepProp
   const handleGenerateClick = () => {
     setLoading(true);
     onGenerate();
+  }
+
+  const handleRemoveFile = () => {
+      onFileSelect(null);
+      setUploadProgress(null);
   }
 
   return (
@@ -70,7 +117,7 @@ export function UploadStep({ onFileSelect, onGenerate, pdfFile }: UploadStepProp
           <CardDescription>Transform your 2D floor plans into photorealistic kitchen renders.</CardDescription>
         </CardHeader>
         <CardContent>
-          {!pdfFile ? (
+          {!pdfFile && uploadProgress === null ? (
             <div
               {...getRootProps()}
               className={cn(
@@ -83,16 +130,21 @@ export function UploadStep({ onFileSelect, onGenerate, pdfFile }: UploadStepProp
               <p className="font-semibold">Drag & drop a PDF file here</p>
               <p className="text-sm text-muted-foreground">or click to select a file</p>
             </div>
+          ) : uploadProgress !== null && uploadProgress < 100 ? (
+            <div className='flex flex-col items-center gap-4'>
+                <p className='text-muted-foreground'>Uploading file...</p>
+                <Progress value={uploadProgress} className="w-full" />
+            </div>
           ) : (
             <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 p-4">
-              <div className="flex items-center gap-3">
-                <File className="h-6 w-6 text-primary" />
-                <span className="truncate font-medium">{pdfFile.name}</span>
+              <div className="flex items-center gap-3 overflow-hidden">
+                <File className="h-6 w-6 shrink-0 text-primary" />
+                <span className="truncate font-medium">{pdfFile?.name}</span>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => onFileSelect(null as any, '')}
+                onClick={handleRemoveFile}
                 className="h-8 w-8 shrink-0"
               >
                 <X className="h-4 w-4" />
