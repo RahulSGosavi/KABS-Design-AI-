@@ -48,7 +48,7 @@ const generateKitchenRenderFlow = ai.defineFlow(
   async ({floorPlanDataUri}) => {
     const prompt = {
         prompt: [
-        {text: 'You are an AI that generates photorealistic kitchen renders from 2D floor plans. Take the provided floor plan and generate a photorealistic kitchen render, preserving the original layout.'},
+        {text: 'You are an AI that generates photorealistic kitchen renders from 2D floor plans. Your task is to take the provided floor plan and generate a photorealistic kitchen render. It is crucial that you preserve the original layout, cabinet styles (e.g., wooden, not glass), and appliance placements exactly as specified in the floor plan. Do not add or change elements like cabinet materials.'},
         {media: {url: floorPlanDataUri}}
       ],
       model: 'googleai/gemini-2.5-flash-image-preview',
