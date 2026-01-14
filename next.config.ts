@@ -35,9 +35,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default () => {
-    const plugins = [];
-    return plugins.reduce((acc, next) => next(acc), {
-        ...nextConfig,
-    })
-};
+export default nextConfig;

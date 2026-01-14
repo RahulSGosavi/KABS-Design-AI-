@@ -27,18 +27,7 @@ export function UploadStep({ onFileSelect, onGenerate, pdfFile }: UploadStepProp
     (acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
       if (file && file.type === 'application/pdf') {
-        setUploadProgress(0);
-        const reader = new FileReader();
-        reader.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            setUploadProgress(progress);
-          }
-        };
-        reader.onload = () => {
-          onFileSelect(file);
-        };
-        reader.readAsDataURL(file);
+        onFileSelect(file);
       }
     },
     [onFileSelect]
@@ -82,7 +71,7 @@ export function UploadStep({ onFileSelect, onGenerate, pdfFile }: UploadStepProp
           <CardDescription>Transform your 2D floor plans into photorealistic kitchen renders.</CardDescription>
         </CardHeader>
         <CardContent>
-          {!pdfFile && uploadProgress === null ? (
+          {!pdfFile ? (
             <div
               {...getRootProps()}
               className={cn(
@@ -94,11 +83,6 @@ export function UploadStep({ onFileSelect, onGenerate, pdfFile }: UploadStepProp
               <UploadCloud className="mb-4 h-10 w-10 text-muted-foreground" />
               <p className="font-semibold">Drag & drop a PDF file here</p>
               <p className="text-sm text-muted-foreground">or click to select a file</p>
-            </div>
-          ) : uploadProgress !== null && uploadProgress < 100 ? (
-            <div className='flex flex-col items-center gap-4'>
-                <p className='text-muted-foreground'>Uploading file...</p>
-                <Progress value={uploadProgress} className="w-full" />
             </div>
           ) : (
             <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 p-4">
