@@ -1,11 +1,11 @@
 'use client';
 
-import { useRef } from 'react';
 import type { ModifyKitchenElementColorsInput } from '@/ai/flows/modify-kitchen-colors';
 import { getMaskByName } from '@/lib/masks';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Label } from '@/components/ui/label';
-import { Paintbrush } from 'lucide-react';
+import { Paintbrush, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 interface ColorPanelProps {
   baseImage: string;
@@ -14,10 +14,51 @@ interface ColorPanelProps {
 }
 
 const colorableElements = [
-  { id: 'baseCabinets', name: 'Base Cabinets', defaultColor: '#A0A0A0' },
-  { id: 'wallCabinets', name: 'Wall Cabinets', defaultColor: '#C0C0C0' },
-  { id: 'walls', name: 'Walls', defaultColor: '#F0F0F0' },
+  { id: 'baseCabinets', name: 'Base Cabinets' },
+  { id: 'wallCabinets', name: 'Wall Cabinets' },
+  { id: 'walls', name: 'Walls' },
 ];
+
+const colorPalette = [
+  { name: 'White', value: '#FFFFFF' },
+  { name: 'Light Gray', value: '#E5E5E5' },
+  { name: 'Sage Green', value: '#B2C2A3' },
+  { name: 'Navy Blue', value: '#3A4D6F' },
+  { name: 'Cream', value: '#F5F5DC' },
+  { name: 'Charcoal', value: '#36454F' },
+];
+
+function ColorPalette({ elementId, onColorSelect, isModifying }: { elementId: string; onColorSelect: (color: string) => void; isModifying: boolean }) {
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+
+  const handleSelect = (color: string) => {
+    setSelectedColor(color);
+    onColorSelect(color);
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2 p-2">
+      {colorPalette.map((color) => (
+        <button
+          key={`${elementId}-${color.name}`}
+          type="button"
+          title={color.name}
+          onClick={() => handleSelect(color.value)}
+          disabled={isModifying}
+          className={cn(
+            'flex h-8 w-8 items-center justify-center rounded-md border-2 transition-all disabled:cursor-not-allowed',
+            selectedColor === color.value ? 'border-primary' : 'border-transparent'
+          )}
+          style={{ backgroundColor: color.value }}
+        >
+          {selectedColor === color.value && <Check className="h-5 w-5 text-primary-foreground mix-blend-difference" />}
+          <span className="sr-only">{color.name}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 
 export function ColorPanel({ baseImage, onColorChange, isModifying }: ColorPanelProps) {
   const handleColorSelect = (elementId: string, newColor: string) => {
@@ -42,20 +83,11 @@ export function ColorPanel({ baseImage, onColorChange, isModifying }: ColorPanel
           <AccordionItem value={element.id} key={element.id}>
             <AccordionTrigger>{element.name}</AccordionTrigger>
             <AccordionContent>
-              <div className="flex items-center gap-4 p-2">
-                <Label htmlFor={`${element.id}-color-picker`} className="sr-only">
-                  {element.name} Color
-                </Label>
-                <input
-                  id={`${element.id}-color-picker`}
-                  type="color"
-                  defaultValue={element.defaultColor}
-                  onChange={(e) => handleColorSelect(element.id, e.target.value)}
-                  disabled={isModifying}
-                  className="h-10 w-10 cursor-pointer appearance-none rounded-md border-none bg-transparent p-0 disabled:cursor-not-allowed"
-                />
-                <span className="text-sm text-muted-foreground">Select a color to instantly update the render.</span>
-              </div>
+              <ColorPalette 
+                elementId={element.id}
+                onColorSelect={(color) => handleColorSelect(element.id, color)}
+                isModifying={isModifying}
+              />
             </AccordionContent>
           </AccordionItem>
         ))}
