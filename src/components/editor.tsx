@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 
 import Image from 'next/image';
 import {
@@ -24,18 +25,26 @@ interface EditorProps {
   isModifyingColor: boolean;
   pdfFile: File;
   pdfDataUri: string;
-  onColorChange: (input: ModifyKitchenElementColorsInput) => void;
+  onColorChange: (input: ModifyKitchenElementColorsInput) => Promise<{ modifiedImage: string } | undefined>;
   onStartOver: () => void;
 }
 
 export function Editor({
-  renderedImage,
+  renderedImage: initialRenderedImage,
   isModifyingColor,
   pdfFile,
   pdfDataUri,
   onColorChange,
   onStartOver,
 }: EditorProps) {
+  const [renderedImage, setRenderedImage] = useState(initialRenderedImage);
+
+  const handleColorChange = async (input: ModifyKitchenElementColorsInput) => {
+    const result = await onColorChange(input);
+    if (result && result.modifiedImage) {
+      setRenderedImage(result.modifiedImage);
+    }
+  };
 
   const handleDownloadImage = () => {
     const link = document.createElement('a');
@@ -67,7 +76,7 @@ export function Editor({
         <SidebarContent className="p-2">
            <ColorPanel
               baseImage={renderedImage}
-              onColorChange={onColorChange}
+              onColorChange={handleColorChange}
               isModifying={isModifyingColor}
             />
         </SidebarContent>
@@ -100,6 +109,7 @@ export function Editor({
               fill
               className="object-contain transition-opacity duration-300"
               priority
+              key={renderedImage}
             />
             {isModifyingColor && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300">

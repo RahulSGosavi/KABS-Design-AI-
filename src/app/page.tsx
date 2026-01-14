@@ -68,13 +68,13 @@ export default function Home() {
     setIsModifyingColor(true);
     try {
       const output = await modifyKitchenElementColors(input);
-      setRenderedImage(output.modifiedImage);
-    } catch (err) {
+      return output;
+    } catch (err: any) {
       console.error(err);
       toast({
         variant: 'destructive',
         title: 'Color Change Failed',
-        description: 'Could not apply the color change. Please try again.',
+        description: err.message || 'Could not apply the color change. Please try again.',
       });
     } finally {
       setIsModifyingColor(false);

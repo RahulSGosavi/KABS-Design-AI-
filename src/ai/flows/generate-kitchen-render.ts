@@ -15,7 +15,7 @@ const GenerateKitchenRenderInputSchema = z.object({
   floorPlanDataUri: z
     .string()
     .describe(
-      'A 2D floor plan PDF as a data URI that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.' // Corrected description
+      "A 2D floor plan PDF as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
 });
 export type GenerateKitchenRenderInput = z.infer<
@@ -39,27 +39,48 @@ export async function generateKitchenRender(
   return generateKitchenRenderFlow(input);
 }
 
-const generateKitchenRenderPrompt = ai.definePrompt({
-  name: 'generateKitchenRenderPrompt',
-  input: {schema: GenerateKitchenRenderInputSchema},
-  output: {schema: GenerateKitchenRenderOutputSchema},
-  prompt: `You are an AI that generates photorealistic kitchen renders from 2D floor plans.
-
-  Take the provided floor plan and generate a photorealistic kitchen render, preserving the original layout.
-
-  Floor Plan: {{media url=floorPlanDataUri}}
-  `, // Corrected Handlebars syntax
-});
-
 const generateKitchenRenderFlow = ai.defineFlow(
   {
     name: 'generateKitchenRenderFlow',
     inputSchema: GenerateKitchenRenderInputSchema,
     outputSchema: GenerateKitchenRenderOutputSchema,
   },
-  async input => {
-    // Call the prompt to generate the kitchen render.
-    const {output} = await generateKitchenRenderPrompt(input);
-    return output!;
+  async ({floorPlanDataUri}) => {
+    const {output} = await ai.generate({
+      prompt: [
+        {text: 'You are an AI that generates photorealistic kitchen renders from 2D floor plans. Take the provided floor plan and generate a photorealistic kitchen render, preserving the original layout.'},
+        {media: {url: floorPlanDataUri}}
+      ],
+      model: 'googleai/gemini-2.5-flash',
+      output: {
+        schema: GenerateKitchenRenderOutputSchema,
+      },
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'],
+      },
+    });
+    
+    // Fallback in case the model does not return the expected output format.
+    if (output) {
+      return output;
+    } else {
+      // Find the first media part and assume it is the rendered image.
+      const { message } = await ai.generate({
+        prompt: [
+          {text: 'You are an AI that generates photorealistic kitchen renders from 2D floor plans. Take the provided floor plan and generate a photorealistic kitchen render, preserving the original layout.'},
+          {media: {url: floorPlanDataUri}}
+        ],
+        model: 'googleai/gemini-2.5-flash',
+        config: {
+          responseModalities: ['TEXT', 'IMAGE'],
+        },
+      });
+
+      const imagePart = message.content.find(part => part.media);
+      if (!imagePart || !imagePart.media) {
+        throw new Error("Render generation failed: No image was returned from the model.");
+      }
+      return { renderDataUri: imagePart.media.url };
+    }
   }
 );
