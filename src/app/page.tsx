@@ -1,3 +1,113 @@
+'use client';
+
+import { useState } from 'react';
+import { useFlow } from '@genkit-ai/next/client';
+import type { GenerateKitchenRenderInput } from '@/ai/flows/generate-kitchen-render';
+import type { ModifyKitchenElementColorsInput } from '@/ai/flows/modify-kitchen-colors';
+import { useToast } from '@/hooks/use-toast';
+import { UploadStep } from '@/components/upload-step';
+import { Editor } from '@/components/editor';
+import { Loader2 } from 'lucide-react';
+import { KabsLogo } from '@/components/kabs-logo';
+
+type Step = 'upload' | 'rendering' | 'editing';
+
 export default function Home() {
-  return <></>;
+  const { toast } = useToast();
+  const [step, setStep] = useState<Step>('upload');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfDataUri, setPdfDataUri] = useState<string | null>(null);
+  const [renderedImage, setRenderedImage] = useState<string | null>(null);
+  const [isModifyingColor, setIsModifyingColor] = useState(false);
+
+  const { run: generateRender } = useFlow(
+    '/api/generateKitchenRender',
+    {
+      onSuccess: (output) => {
+        setRenderedImage(output.renderDataUri);
+        setStep('editing');
+      },
+      onError: (err) => {
+        console.error(err);
+        toast({
+          variant: 'destructive',
+          title: 'Render Failed',
+          description: 'Could not generate the kitchen render. Please try again.',
+        });
+        setStep('upload');
+      },
+    }
+  );
+
+  const { run: modifyColor } = useFlow('/api/modifyKitchenColors', {
+    onSuccess: (output) => {
+      setRenderedImage(output.modifiedImage);
+    },
+    onError: (err) => {
+      console.error(err);
+      toast({
+        variant: 'destructive',
+        title: 'Color Change Failed',
+        description: 'Could not apply the color change. Please try again.',
+      });
+    },
+    onFinally: () => {
+      setIsModifyingColor(false);
+    }
+  });
+
+
+  const handleFileSelect = (file: File, dataUri: string) => {
+    setPdfFile(file);
+    setPdfDataUri(dataUri);
+  };
+
+  const handleGenerate = () => {
+    if (!pdfDataUri) return;
+    setStep('rendering');
+    const input: GenerateKitchenRenderInput = { floorPlanDataUri: pdfDataUri };
+    generateRender(input);
+  };
+  
+  const handleColorChange = (input: ModifyKitchenElementColorsInput) => {
+    setIsModifyingColor(true);
+    modifyColor(input);
+  };
+
+  const handleStartOver = () => {
+    setStep('upload');
+    setPdfFile(null);
+    setPdfDataUri(null);
+    setRenderedImage(null);
+  };
+
+  if (step === 'rendering') {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-4 text-center">
+        <KabsLogo className="h-12 w-12 text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <h1 className="text-2xl font-semibold tracking-tight">Generating Your Kitchen</h1>
+        <p className="text-muted-foreground">The AI is working its magic. This might take a moment...</p>
+      </main>
+    );
+  }
+
+  if (step === 'editing' && renderedImage && pdfFile && pdfDataUri) {
+    return (
+      <Editor
+        renderedImage={renderedImage}
+        isModifyingColor={isModifyingColor}
+        pdfFile={pdfFile}
+        pdfDataUri={pdfDataUri}
+        onColorChange={handleColorChange}
+        onStartOver={handleStartOver}
+      />
+    );
+  }
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+      <UploadStep onFileSelect={handleFileSelect} onGenerate={handleGenerate} pdfFile={pdfFile} />
+    </main>
+  );
 }
