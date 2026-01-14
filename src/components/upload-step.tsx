@@ -23,57 +23,22 @@ export function UploadStep({ onFileSelect, onGenerate, pdfFile }: UploadStepProp
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
-  const readFileInChunks = (file: File) => {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      const chunkSize = 1024 * 512; // 512KB chunks
-      const totalChunks = Math.ceil(file.size / chunkSize);
-      let currentChunk = 0;
-      let fileContent = '';
-
-      reader.onload = (event: ProgressEvent<FileReader>) => {
-        if (event.target?.result) {
-          // The result includes the 'data:mime/type;base64,' prefix. We only want the base64 part.
-          const base64Part = (event.target.result as string).split(',')[1];
-          fileContent += base64Part;
-          currentChunk++;
-          setUploadProgress(Math.round((currentChunk / totalChunks) * 100));
-
-          if (currentChunk < totalChunks) {
-            loadNextChunk();
-          } else {
-            // Re-add the data URI prefix to the concatenated content
-            const finalDataUri = `data:${file.type};base64,${fileContent}`;
-            setUploadProgress(100);
-            setTimeout(() => {
-                onFileSelect(file);
-                resolve(finalDataUri);
-            }, 300);
-          }
-        }
-      };
-
-      reader.onerror = (error) => {
-        reject(error);
-      };
-      
-      const loadNextChunk = () => {
-        const start = currentChunk * chunkSize;
-        const end = Math.min(start + chunkSize, file.size);
-        const blobSlice = file.slice(start, end);
-        reader.readAsDataURL(blobSlice);
-      }
-
-      loadNextChunk();
-    });
-  };
-
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
       if (file && file.type === 'application/pdf') {
         setUploadProgress(0);
-        readFileInChunks(file);
+        const reader = new FileReader();
+        reader.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            setUploadProgress(progress);
+          }
+        };
+        reader.onload = () => {
+          onFileSelect(file);
+        };
+        reader.readAsDataURL(file);
       }
     },
     [onFileSelect]
