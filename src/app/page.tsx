@@ -1,14 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  generateKitchenRender,
-  type GenerateKitchenRenderInput,
-} from '@/ai/flows/generate-kitchen-render';
-import {
-  modifyKitchenElementColors,
-  type ModifyKitchenElementColorsInput,
-} from '@/ai/flows/modify-kitchen-colors';
+import { modifyKitchenElementColors, type ModifyKitchenElementColorsInput } from '@/ai/flows/modify-kitchen-colors';
 import { useToast } from '@/hooks/use-toast';
 import { UploadStep } from '@/components/upload-step';
 import { Editor } from '@/components/editor';
@@ -44,17 +37,28 @@ export default function Home() {
     if (!pdfDataUri) return;
     setStep('rendering');
     try {
-      const input: GenerateKitchenRenderInput = { floorPlanDataUri: pdfDataUri };
-      const output = await generateKitchenRender(input);
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ floorPlanDataUri: pdfDataUri }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const output = await response.json();
       setRenderedImage(output.renderDataUri);
       setStep('editing');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       toast({
         variant: 'destructive',
         title: 'Render Failed',
-        description:
-          'Could not generate the kitchen render. Please try again.',
+        description: err.message || 'Could not generate the kitchen render. Please try again.',
       });
       setStep('upload');
     }
