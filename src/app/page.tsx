@@ -34,15 +34,15 @@ export default function Home() {
   };
 
   const handleGenerate = async () => {
-    if (!pdfDataUri) return;
+    if (!pdfFile) return;
     setStep('rendering');
     try {
+      const formData = new FormData();
+      formData.append('pdfFile', pdfFile);
+
       const response = await fetch('/api/upload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ floorPlanDataUri: pdfDataUri }),
+        body: formData,
       });
 
       if (!response.ok) {

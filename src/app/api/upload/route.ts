@@ -1,26 +1,21 @@
-
 import { generateKitchenRender } from '@/ai/flows/generate-kitchen-render';
 import { NextResponse } from 'next/server';
 
-// Increase the default body size limit for this route
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
-
 export async function POST(request: Request) {
   try {
-    const { floorPlanDataUri } = await request.json();
+    const formData = await request.formData();
+    const pdfFile = formData.get('pdfFile') as File | null;
 
-    if (!floorPlanDataUri) {
+    if (!pdfFile) {
       return NextResponse.json(
-        { error: 'Missing floorPlanDataUri' },
+        { error: 'Missing PDF file' },
         { status: 400 }
       );
     }
+
+    // Convert file to buffer, then to Base64 data URI
+    const buffer = Buffer.from(await pdfFile.arrayBuffer());
+    const floorPlanDataUri = `data:${pdfFile.type};base64,${buffer.toString('base64')}`;
 
     const output = await generateKitchenRender({ floorPlanDataUri });
 
