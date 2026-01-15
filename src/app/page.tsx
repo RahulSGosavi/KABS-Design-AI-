@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { modifyKitchenElementColors, type ModifyKitchenElementColorsInput } from '@/ai/flows/modify-kitchen-colors';
+import { applyColorPalette, type ApplyColorPaletteInput } from '@/ai/flows/apply-color-palette';
 import { useToast } from '@/hooks/use-toast';
 import { UploadStep } from '@/components/upload-step';
 import { Editor } from '@/components/editor';
@@ -15,7 +15,8 @@ export default function Home() {
   const [step, setStep] = useState<Step>('upload');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfDataUri, setPdfDataUri] = useState<string | null>(null);
-  const [renderedImage, setRenderedImage] = useState<string | null>(null);
+  const [originalRenderedImage, setOriginalRenderedImage] = useState<string | null>(null);
+  const [modifiedRenderedImage, setModifiedRenderedImage] = useState<string | null>(null);
   const [isModifyingColor, setIsModifyingColor] = useState(false);
 
   const handleFileSelect = (file: File | null) => {
@@ -51,7 +52,8 @@ export default function Home() {
       }
 
       const output = await response.json();
-      setRenderedImage(output.renderDataUri);
+      setOriginalRenderedImage(output.renderDataUri);
+      setModifiedRenderedImage(output.renderDataUri);
       setStep('editing');
     } catch (err: any) {
       console.error(err);
@@ -64,11 +66,16 @@ export default function Home() {
     }
   };
 
-  const handleColorChange = async (input: ModifyKitchenElementColorsInput) => {
+  const handleColorChange = async (input: ApplyColorPaletteInput) => {
+    if (!originalRenderedImage) return;
     setIsModifyingColor(true);
     try {
-      const output = await modifyKitchenElementColors(input);
-      return output;
+      // Always use the original image as the base for modifications
+      const finalInput = { ...input, baseImage: originalRenderedImage };
+      const output = await applyColorPalette(finalInput);
+      if (output && output.modifiedImage) {
+        setModifiedRenderedImage(output.modifiedImage);
+      }
     } catch (err: any) {
       console.error(err);
       toast({
@@ -85,8 +92,13 @@ export default function Home() {
     setStep('upload');
     setPdfFile(null);
     setPdfDataUri(null);
-    setRenderedImage(null);
+    setOriginalRenderedImage(null);
+    setModifiedRenderedImage(null);
   };
+  
+  const handleResetToOriginal = () => {
+    setModifiedRenderedImage(originalRenderedImage);
+  }
 
   if (step === 'rendering') {
     return (
@@ -103,15 +115,16 @@ export default function Home() {
     );
   }
 
-  if (step === 'editing' && renderedImage && pdfFile && pdfDataUri) {
+  if (step === 'editing' && modifiedRenderedImage && pdfFile && pdfDataUri) {
     return (
       <Editor
-        renderedImage={renderedImage}
+        renderedImage={modifiedRenderedImage}
         isModifyingColor={isModifyingColor}
         pdfFile={pdfFile}
         pdfDataUri={pdfDataUri}
         onColorChange={handleColorChange}
         onStartOver={handleStartOver}
+        onResetToOriginal={handleResetToOriginal}
       />
     );
   }

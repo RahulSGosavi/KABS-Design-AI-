@@ -1,15 +1,14 @@
 'use client';
 
-import type { ModifyKitchenElementColorsInput } from '@/ai/flows/modify-kitchen-colors';
 import { getMaskByName } from '@/lib/masks';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Paintbrush, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Paintbrush, Check, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
 interface ColorPanelProps {
-  baseImage: string;
-  onColorChange: (input: ModifyKitchenElementColorsInput) => void;
+  onColorChange: (modifications: { elementId: string, maskImage: string, newColor: string }[]) => void;
   isModifying: boolean;
 }
 
@@ -28,14 +27,10 @@ const colorPalette = [
   { name: 'Charcoal', value: '#36454F' },
 ];
 
-function ColorPalette({ elementId, onColorSelect, isModifying }: { elementId: string; onColorSelect: (color: string) => void; isModifying: boolean }) {
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+type SelectedColors = Record<string, string | null>;
 
-  const handleSelect = (color: string) => {
-    setSelectedColor(color);
-    onColorSelect(color);
-  };
 
+function ColorPalettePicker({ elementId, selectedColor, onColorSelect, isModifying }: { elementId: string; selectedColor: string | null; onColorSelect: (elementId: string, color: string) => void; isModifying: boolean }) {
   return (
     <div className="flex flex-wrap gap-2 p-2">
       {colorPalette.map((color) => (
@@ -43,7 +38,7 @@ function ColorPalette({ elementId, onColorSelect, isModifying }: { elementId: st
           key={`${elementId}-${color.name}`}
           type="button"
           title={color.name}
-          onClick={() => handleSelect(color.value)}
+          onClick={() => onColorSelect(elementId, color.value)}
           disabled={isModifying}
           className={cn(
             'flex h-8 w-8 items-center justify-center rounded-md border-2 transition-all disabled:cursor-not-allowed',
@@ -60,15 +55,28 @@ function ColorPalette({ elementId, onColorSelect, isModifying }: { elementId: st
 }
 
 
-export function ColorPanel({ baseImage, onColorChange, isModifying }: ColorPanelProps) {
-  const handleColorSelect = (elementId: string, newColor: string) => {
-    const maskImage = getMaskByName(elementId);
-    if (maskImage) {
-      onColorChange({
-        baseImage,
-        maskImage,
-        newColor,
-      });
+export function ColorPanel({ onColorChange, isModifying }: ColorPanelProps) {
+  const [selectedColors, setSelectedColors] = useState<SelectedColors>({});
+
+  const handleColorSelect = (elementId: string, color: string) => {
+    setSelectedColors(prev => ({
+      ...prev,
+      [elementId]: prev[elementId] === color ? null : color,
+    }));
+  };
+
+  const handleApplyColors = () => {
+    const modifications = Object.entries(selectedColors)
+      .map(([elementId, newColor]) => {
+        if (!newColor) return null;
+        const maskImage = getMaskByName(elementId);
+        if (!maskImage) return null;
+        return { elementId, maskImage, newColor };
+      })
+      .filter((item): item is { elementId: string, maskImage: string, newColor: string } => item !== null);
+      
+    if (modifications.length > 0) {
+      onColorChange(modifications);
     }
   };
 
@@ -83,15 +91,20 @@ export function ColorPanel({ baseImage, onColorChange, isModifying }: ColorPanel
           <AccordionItem value={element.id} key={element.id}>
             <AccordionTrigger>{element.name}</AccordionTrigger>
             <AccordionContent>
-              <ColorPalette 
+              <ColorPalettePicker 
                 elementId={element.id}
-                onColorSelect={(color) => handleColorSelect(element.id, color)}
+                selectedColor={selectedColors[element.id] || null}
+                onColorSelect={handleColorSelect}
                 isModifying={isModifying}
               />
             </AccordionContent>
           </AccordionItem>
         ))}
       </Accordion>
+      <Button onClick={handleApplyColors} disabled={isModifying || Object.values(selectedColors).every(c => c === null)}>
+        <Sparkles className="mr-2" />
+        Apply Colors
+      </Button>
     </div>
   );
 }

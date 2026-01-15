@@ -9,14 +9,11 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Download, Redo, Loader2 } from 'lucide-react';
+import { Download, Redo, Loader2, RotateCcw } from 'lucide-react';
 import { ColorPanel } from '@/components/color-panel';
-import type { ModifyKitchenElementColorsInput } from '@/ai/flows/modify-kitchen-colors';
+import type { ApplyColorPaletteInput } from '@/ai/flows/apply-color-palette';
 import { KabsLogo } from './kabs-logo';
 import { Separator } from './ui/separator';
 
@@ -25,27 +22,26 @@ interface EditorProps {
   isModifyingColor: boolean;
   pdfFile: File;
   pdfDataUri: string;
-  onColorChange: (input: ModifyKitchenElementColorsInput) => Promise<{ modifiedImage: string } | undefined>;
+  onColorChange: (input: ApplyColorPaletteInput) => Promise<void>;
   onStartOver: () => void;
+  onResetToOriginal: () => void;
 }
 
 export function Editor({
-  renderedImage: initialRenderedImage,
+  renderedImage,
   isModifyingColor,
   pdfFile,
   pdfDataUri,
   onColorChange,
   onStartOver,
+  onResetToOriginal,
 }: EditorProps) {
-  const [renderedImage, setRenderedImage] = useState(initialRenderedImage);
 
-  const handleColorChange = async (input: ModifyKitchenElementColorsInput) => {
-    const result = await onColorChange(input);
-    if (result && result.modifiedImage) {
-      setRenderedImage(result.modifiedImage);
-    }
+  const handleApplyColors = async (modifications: { elementId: string, maskImage: string, newColor: string }[]) => {
+    // The baseImage will be handled by the parent page component
+    await onColorChange({ baseImage: '', modifications });
   };
-
+  
   const handleDownloadImage = () => {
     const link = document.createElement('a');
     link.href = renderedImage;
@@ -75,13 +71,15 @@ export function Editor({
         </SidebarHeader>
         <SidebarContent className="p-2">
            <ColorPanel
-              baseImage={renderedImage}
-              onColorChange={handleColorChange}
+              onColorChange={handleApplyColors}
               isModifying={isModifyingColor}
             />
         </SidebarContent>
         <SidebarFooter className="p-2">
           <div className="flex flex-col gap-2">
+             <Button variant="outline" onClick={onResetToOriginal}>
+              <RotateCcw className="mr-2" /> Reset Colors
+            </Button>
             <Separator className="my-2" />
              <div className="flex items-center gap-2 mb-2">
               <Download className="h-5 w-5" />
